@@ -39,17 +39,19 @@ def job_block(ws):
 # ---------- 1. Filter log ----------
 wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
 top = job_block(ws)
-header(ws, top, ["Unit", "Filter size (W x L x D)", "Qty per change", "Status", "Filter set installed", "MERV", "Notes"])
+header(ws, top, ["Unit", "Filter size (W x L x D)", "Qty per change", "Status", "Filter set installed", "MERV", "Installed size if different from spec", "Notes"])
 for i, (unit, size, qty, status) in enumerate(data["units"], top + 1):
     done = status == "Replaced"
-    for c, v in enumerate([unit, size, qty, status, 2 if done else None, 8 if done else None, None], 1):
+    for c, v in enumerate([unit, size, qty, status, 2 if done else None, 8 if done else None, None, None], 1):
         ws.cell(row=i, column=c, value=v)
     if status == "Not replaced":
         ws.cell(row=i, column=4).fill = BAD
     if not done:
         ws.cell(row=i, column=5).fill = BLANK
         ws.cell(row=i, column=6).fill = BLANK
-widths(ws, [14, 22, 14, 16, 20, 8, 40])
+    if done and size.endswith('x2'):
+        ws.cell(row=i, column=7).fill = BLANK
+widths(ws, [14, 22, 14, 16, 20, 8, 26, 40])
 ws.freeze_panes = ws.cell(row=top + 1, column=1)
 last_unit_row = top + len(data["units"])
 wb.save("Filter_Log.xlsx")

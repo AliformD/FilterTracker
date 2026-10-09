@@ -2,7 +2,7 @@
  "job": {
   "job_number": "2250823",
   "project": "Austin Stone",
-  "phase": "",
+  "phase": "None (single phase for now)",
   "airco_pm": "Jordan",
   "ordered_by": "Angel Leon"
  },
@@ -189,12 +189,12 @@
  "questions": [
   [
    "Open",
-   "Which RTUs got which size? 4 RTUs (1A,2A,1C,2C) need 48 of 2\", only 36 ordered; 12 extra 4\" ordered. Did any of those four get filters yet, and what size?",
+   "Possible size substitution on set 2: 4\" filters may have been installed in some 2\" RTUs (1A, 2A, 1C, 2C). 48 of 2\" needed, 36 ordered; 12 extra 4\" ordered. Which units got which? (Angel's theory, unconfirmed)",
    "Angel / techs"
   ],
   [
    "Open",
-   "Are the 12 extra 4\" filters (8 of 20x25x4, 4 of 20x20x4) RTU-2B-2's? When will 2B-2 be done?",
+   "Are the 12 extra 4\" filters (8 of 20x25x4, 4 of 20x20x4) RTU-2B-2's, or were they used as substitutes? When will 2B-2 be done?",
    "Angel"
   ],
   [
@@ -204,18 +204,23 @@
   ],
   [
    "Open",
-   "AHU-1 and ERV-1: are the sizes right (20x24 vs the RTUs' 20x25) and are they still not replaced?",
+   "AHU-1 and ERV-1 are not replaced yet. Are their sizes right (20x24 vs the RTUs' 20x25)? Set 3 must match the spec size exactly.",
    "Angel / PM"
   ],
   [
-   "Open",
-   "Project phase for this job (blank for now).",
+   "Answered",
+   "Phase: none right now. Added scope may come as a phase on this job number or a new job number; jobs are always separated by job number.",
    "Angel"
   ],
   [
-   "Open",
-   "Sets 3 (final, MERV 13) and attic stock: any quantity or timing planned?",
-   "Jordan (PM)"
+   "Answered",
+   "Attic stock: none planned. The PM can add it at any time (MERV 13).",
+   "Angel"
+  ],
+  [
+   "Answered",
+   "AHU-1 and ERV-1 not replaced yet.",
+   "Angel"
   ],
   [
    "Answered",
