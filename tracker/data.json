@@ -185,5 +185,52 @@
     ]
    ]
   }
+ ],
+ "questions": [
+  [
+   "Open",
+   "Which RTUs got which size? 4 RTUs (1A,2A,1C,2C) need 48 of 2\", only 36 ordered; 12 extra 4\" ordered. Did any of those four get filters yet, and what size?",
+   "Angel / techs"
+  ],
+  [
+   "Open",
+   "Are the 12 extra 4\" filters (8 of 20x25x4, 4 of 20x20x4) RTU-2B-2's? When will 2B-2 be done?",
+   "Angel"
+  ],
+  [
+   "Open",
+   "For each order, which units did the filters go to (fills the 'Units it went to' column)?",
+   "Techs"
+  ],
+  [
+   "Open",
+   "AHU-1 and ERV-1: are the sizes right (20x24 vs the RTUs' 20x25) and are they still not replaced?",
+   "Angel / PM"
+  ],
+  [
+   "Open",
+   "Project phase for this job (blank for now).",
+   "Angel"
+  ],
+  [
+   "Open",
+   "Sets 3 (final, MERV 13) and attic stock: any quantity or timing planned?",
+   "Jordan (PM)"
+  ],
+  [
+   "Answered",
+   "PO numbers: 380118 for the 12-filter order, 382244 for the 60-filter order.",
+   "Angel"
+  ],
+  [
+   "Answered",
+   "Order 1 date is 9/22/2026 (not 9/25).",
+   "Angel"
+  ],
+  [
+   "Answered",
+   "Both orders are Set 2, MERV 8.",
+   "Angel"
+  ]
  ]
 }

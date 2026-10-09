@@ -103,3 +103,18 @@ for _, s, q, st in data["units"]:
     if st == "Replaced": need[s] += q
 for s in sizes:
     print(f"{s:10} ordered {ordered[s]:3}  needed {need[s]:3}  diff {ordered[s]-need[s]:+d}")
+
+# ---------- 3. Open questions (working notes, not part of the two shipped files) ----------
+wb = Workbook(); ws = wb.active; ws.title = "Open Questions"
+ws.cell(row=1, column=1, value=f"Job {job['job_number']} - {job['project']}").font = Font(bold=True, size=13)
+header(ws, 3, ["Status", "Question", "Who knows"])
+for i, (st, q, who) in enumerate(data["questions"], 4):
+    for c, v in enumerate([st, q, who], 1):
+        cell = ws.cell(row=i, column=c, value=v)
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+    if st == "Open":
+        ws.cell(row=i, column=1).fill = BLANK
+n_open = sum(1 for q in data["questions"] if q[0] == "Open")
+ws.cell(row=2, column=1, value=f"{n_open} open - ready to ship when this is 0 and every unit and filter is accounted for")
+widths(ws, [11, 100, 18])
+wb.save("Open_Questions.xlsx")
