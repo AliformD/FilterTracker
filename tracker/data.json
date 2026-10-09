@@ -1,21 +1,189 @@
 {
-  "job": {"job_number": "", "project": "", "phase": "", "po_number": "", "airco_pm": "", "ordered_by": ""},
-  "units": [
-    ["RTU-1A","20x25x2",8,"Replaced"],["RTU-1A","20x20x2",4,"Replaced"],
-    ["RTU-2A","20x25x2",8,"Replaced"],["RTU-2A","20x20x2",4,"Replaced"],
-    ["RTU-1C","20x25x2",8,"Replaced"],["RTU-1C","20x20x2",4,"Replaced"],
-    ["RTU-2C","20x25x2",8,"Replaced"],["RTU-2C","20x20x2",4,"Replaced"],
-    ["RTU-1B","20x25x4",8,"Replaced"],["RTU-1B","20x20x4",4,"Replaced"],
-    ["RTU-2B-1","20x25x4",8,"Replaced"],["RTU-2B-1","20x20x4",4,"Replaced"],
-    ["RTU-2B-2","20x25x4",8,"Not replaced"],["RTU-2B-2","20x20x4",4,"Not replaced"],
-    ["AHU-1","20x24x4",4,"Not replaced"],["AHU-1","20x20x4",2,"Not replaced"],
-    ["ERV-1","20x24x4",2,"Not replaced"],["ERV-1","16x20x4",2,"Not replaced"],
-    ["ERV-1","20x24x2",2,"Not replaced"],["ERV-1","16x24x2",2,"Not replaced"]
+ "job": {
+  "job_number": "2250823",
+  "project": "Austin Stone",
+  "phase": "",
+  "airco_pm": "Jordan",
+  "ordered_by": "Angel Leon"
+ },
+ "units": [
+  [
+   "RTU-1A",
+   "20x25x2",
+   8,
+   "Replaced"
   ],
-  "orders": [
-    {"date":"2025-09-25","set":"","order_number":"","price":null,"note":"Urgent, units unknown at time of order",
-     "lines":[["20x25x4",8],["20x20x4",4]]},
-    {"date":"2025-10-07","set":"","order_number":"","price":null,"note":"Units unknown at time of order",
-     "lines":[["20x25x4",16],["20x25x2",24],["20x20x4",8],["20x20x2",12]]}
+  [
+   "RTU-1A",
+   "20x20x2",
+   4,
+   "Replaced"
+  ],
+  [
+   "RTU-2A",
+   "20x25x2",
+   8,
+   "Replaced"
+  ],
+  [
+   "RTU-2A",
+   "20x20x2",
+   4,
+   "Replaced"
+  ],
+  [
+   "RTU-1C",
+   "20x25x2",
+   8,
+   "Replaced"
+  ],
+  [
+   "RTU-1C",
+   "20x20x2",
+   4,
+   "Replaced"
+  ],
+  [
+   "RTU-2C",
+   "20x25x2",
+   8,
+   "Replaced"
+  ],
+  [
+   "RTU-2C",
+   "20x20x2",
+   4,
+   "Replaced"
+  ],
+  [
+   "RTU-1B",
+   "20x25x4",
+   8,
+   "Replaced"
+  ],
+  [
+   "RTU-1B",
+   "20x20x4",
+   4,
+   "Replaced"
+  ],
+  [
+   "RTU-2B-1",
+   "20x25x4",
+   8,
+   "Replaced"
+  ],
+  [
+   "RTU-2B-1",
+   "20x20x4",
+   4,
+   "Replaced"
+  ],
+  [
+   "RTU-2B-2",
+   "20x25x4",
+   8,
+   "Not replaced"
+  ],
+  [
+   "RTU-2B-2",
+   "20x20x4",
+   4,
+   "Not replaced"
+  ],
+  [
+   "AHU-1",
+   "20x24x4",
+   4,
+   "Not replaced"
+  ],
+  [
+   "AHU-1",
+   "20x20x4",
+   2,
+   "Not replaced"
+  ],
+  [
+   "ERV-1",
+   "20x24x4",
+   2,
+   "Not replaced"
+  ],
+  [
+   "ERV-1",
+   "16x20x4",
+   2,
+   "Not replaced"
+  ],
+  [
+   "ERV-1",
+   "20x24x2",
+   2,
+   "Not replaced"
+  ],
+  [
+   "ERV-1",
+   "16x24x2",
+   2,
+   "Not replaced"
   ]
+ ],
+ "orders": [
+  {
+   "date": "2026-09-22",
+   "set": "2",
+   "merv": 8,
+   "vendor": "Tex Air Austin",
+   "vendor_so": "766028",
+   "po_number": "",
+   "price": 98.24,
+   "delivery": "Customer pickup",
+   "note": "Urgent, units unknown at time of order. Email request was 9/25, receipt dated 9/22 - confirm date.",
+   "lines": [
+    [
+     "20x25x4",
+     8,
+     8.55
+    ],
+    [
+     "20x20x4",
+     4,
+     7.46
+    ]
+   ]
+  },
+  {
+   "date": "2026-10-07",
+   "set": "2",
+   "merv": 8,
+   "vendor": "Tex Air Austin",
+   "vendor_so": "770738",
+   "po_number": "",
+   "price": 368.44,
+   "delivery": "Delivered 2026-10-09",
+   "note": "Units unknown at time of order.",
+   "lines": [
+    [
+     "20x25x4",
+     16,
+     8.55
+    ],
+    [
+     "20x25x2",
+     24,
+     4.83
+    ],
+    [
+     "20x20x4",
+     8,
+     7.46
+    ],
+    [
+     "20x20x2",
+     12,
+     4.67
+    ]
+   ]
+  }
+ ]
 }
