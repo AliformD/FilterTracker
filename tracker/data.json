@@ -135,10 +135,10 @@
    "merv": 8,
    "vendor": "Tex Air Austin",
    "vendor_so": "766028",
-   "po_number": "",
+   "po_number": "380118",
    "price": 98.24,
    "delivery": "Customer pickup",
-   "note": "Urgent, units unknown at time of order. Email request was 9/25, receipt dated 9/22 - confirm date.",
+   "note": "Urgent, units unknown at time of order.",
    "lines": [
     [
      "20x25x4",
@@ -158,7 +158,7 @@
    "merv": 8,
    "vendor": "Tex Air Austin",
    "vendor_so": "770738",
-   "po_number": "",
+   "po_number": "382244",
    "price": 368.44,
    "delivery": "Delivered 2026-10-09",
    "note": "Units unknown at time of order.",
