@@ -71,25 +71,25 @@
    "RTU-2B-1",
    "20x25x4",
    8,
-   "Replaced"
+   "Not replaced"
   ],
   [
    "RTU-2B-1",
    "20x20x4",
    4,
-   "Replaced"
+   "Not replaced"
   ],
   [
    "RTU-2B-2",
    "20x25x4",
    8,
-   "Not replaced"
+   "Replaced"
   ],
   [
    "RTU-2B-2",
    "20x20x4",
    4,
-   "Not replaced"
+   "Replaced"
   ],
   [
    "AHU-1",
@@ -189,13 +189,8 @@
  "questions": [
   [
    "Open",
-   "Possible size substitution on set 2: 4\" filters may have been installed in some 2\" RTUs (1A, 2A, 1C, 2C). 48 of 2\" needed, 36 ordered; 12 extra 4\" ordered. Which units got which? (Angel's theory, unconfirmed)",
+   "All 7 RTUs need 84 filters, only 72 ordered: one RTU's worth (12) short overall. Either 1 of the 2\" RTUs (1A, 2A, 1C, 2C) still needs 2\" (8 of 20x25x2 + 4 of 20x20x2), or a 2\" unit got 4\" and RTU-2B-1 will be short on 4\". Which units got what size?",
    "Angel / techs"
-  ],
-  [
-   "Open",
-   "Are the 12 extra 4\" filters (8 of 20x25x4, 4 of 20x20x4) RTU-2B-2's, or were they used as substitutes? When will 2B-2 be done?",
-   "Angel"
   ],
   [
    "Open",
@@ -204,8 +199,18 @@
   ],
   [
    "Open",
+   "When will RTU-2B-1 be started? The extra 12 4\" filters ordered are on hand for it unless they were used as substitutes.",
+   "Angel"
+  ],
+  [
+   "Open",
    "AHU-1 and ERV-1 are not replaced yet. Are their sizes right (20x24 vs the RTUs' 20x25)? Set 3 must match the spec size exactly.",
    "Angel / PM"
+  ],
+  [
+   "Answered",
+   "RTU-2B-1 (not 2B-2) is the one RTU not started up yet. 6 of 7 RTUs replaced.",
+   "Angel"
   ],
   [
    "Answered",
