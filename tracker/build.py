@@ -28,21 +28,31 @@ def widths(ws, ws_widths):
 def job_block(ws):
     labels = [("Job number", "job_number"), ("Project name", "project"), ("Phase", "phase"),
               ("Airco PM", "airco_pm"), ("Ordered by", "ordered_by")]
+    if "phase" not in job:  # job without phases
+        labels.remove(("Phase", "phase"))
+    # optional fields, only shown for jobs that have them
+    for lab, key in [("Airco APM", "apm"), ("PM history", "pm_history"), ("GC", "gc"),
+                     ("Job type", "job_type"), ("Warranty expires", "warranty")]:
+        if key in job:
+            labels.append((lab, key))
     for r, (lab, key) in enumerate(labels, 1):
         ws.cell(row=r, column=1, value=lab).font = Font(bold=True)
         c = ws.cell(row=r, column=2, value=job[key] or None)
         if not job[key]:
             c.fill = BLANK
+    if job.get("note"):
+        ws.cell(row=len(labels) + 1, column=1, value=job["note"]).font = Font(italic=True)
+        return len(labels) + 3
     return len(labels) + 2
 
 
 # ---------- 1. Filter log ----------
 wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
 top = job_block(ws)
-header(ws, top, ["Unit", "Filter size (W x L x D)", "Qty per change", "Status", "Filter set installed", "MERV", "Installed size if different from spec", "Notes"])
-for i, (unit, size, qty, status) in enumerate(data["units"], top + 1):
+header(ws, top, ["Unit", "Filter size (W x L x D)", "QTY", "Status", "Filter set installed", "MERV", "Installed size if different from spec", "Notes"])
+for i, (unit, size, qty, status, *note) in enumerate(data["units"], top + 1):
     done = status == "Replaced"
-    for c, v in enumerate([unit, size, qty, status, 2 if done else None, 8 if done else None, None, None], 1):
+    for c, v in enumerate([unit, size, qty, status, 2 if done else None, 8 if done else None, None, note[0] if note else None], 1):
         ws.cell(row=i, column=c, value=v)
     if status == "Not replaced":
         ws.cell(row=i, column=4).fill = BAD
@@ -51,6 +61,10 @@ for i, (unit, size, qty, status) in enumerate(data["units"], top + 1):
         ws.cell(row=i, column=6).fill = BLANK
     if done and size.endswith('x2'):
         ws.cell(row=i, column=7).fill = BLANK
+# no unit list yet: leave blank yellow rows to fill in
+for i in range(top + 1, top + 1 + (data.get("blank_rows", 0) if not data["units"] else 0)):
+    for c in range(1, 9):
+        ws.cell(row=i, column=c).fill = BLANK
 widths(ws, [14, 22, 14, 16, 20, 8, 26, 40])
 ws.freeze_panes = ws.cell(row=top + 1, column=1)
 last_unit_row = top + len(data["units"])
@@ -60,17 +74,17 @@ wb.save("Filter_Log.xlsx")
 wb = Workbook(); ws = wb.active; ws.title = "Order Log"
 top = job_block(ws)
 header(ws, top, ["Order date", "Filter set (1/2/3/Attic)", "Vendor", "Vendor SO #", "Our PO #", "MERV",
-                 "Order total price", "Size", "Qty", "Unit price", "Line total", "Units it went to", "Delivery", "Notes"])
+                 "Order total price", "Size", "QTY", "Unit price", "Line total", "Units it went to", "Delivery", "Notes"])
 r = top + 1
 for o in data["orders"]:
     first = True
     for size, qty, price in o["lines"]:
         vals = [o["date"], o["set"] or None, o["vendor"], o["vendor_so"], o["po_number"] or None, o["merv"],
-                o["price"] if first else None, size, qty, price, f"=I{r}*J{r}", None,
+                o["price"] if first else None, size, qty, price, f"=I{r}*J{r}", (o.get("units") if first else None),
                 o["delivery"] if first else None, o["note"] if first else None]
         for c, v in enumerate(vals, 1):
             cell = ws.cell(row=r, column=c, value=v)
-            if v is None and c in (2, 5, 12):
+            if v is None and (c in (2, 5, 12) or (first and c in (1, 3, 4, 6, 7, 13))):
                 cell.fill = BLANK
         ws.cell(row=r, column=7).number_format = '"$"#,##0.00'
         ws.cell(row=r, column=10).number_format = '"$"#,##0.00'
@@ -82,15 +96,15 @@ ws.freeze_panes = ws.cell(row=top + 1, column=1)
 
 # Reconciliation sheet: formulas read the other sheet, so edits flow through.
 rs = wb.create_sheet("Needed vs Ordered")
-sizes = sorted({s for _, s, _, _ in data["units"]} | {l[0] for o in data["orders"] for l in o["lines"]})
+sizes = sorted({u[1] for u in data["units"]} | {l[0] for o in data["orders"] for l in o["lines"]})
 header(rs, 1, ["Size", "Ordered (all orders)", "Needed - units replaced", "Left over (+) / Short (-)",
                "Still needed - units not yet replaced"])
 for i, s in enumerate(sizes, 2):
     rs.cell(row=i, column=1, value=s)
     rs.cell(row=i, column=2, value=f"=SUMIF('Order Log'!$H${top+1}:$H${order_last},A{i},'Order Log'!$I${top+1}:$I${order_last})")
     # replaced-unit totals typed from the filter log at build time
-    need = sum(q for _, sz, q, st in data["units"] if sz == s and st == "Replaced")
-    rem = sum(q for _, sz, q, st in data["units"] if sz == s and st != "Replaced")
+    need = sum(q for _, sz, q, st, *_ in data["units"] if sz == s and st == "Replaced")
+    rem = sum(q for _, sz, q, st, *_ in data["units"] if sz == s and st != "Replaced")
     rs.cell(row=i, column=3, value=need)
     rs.cell(row=i, column=4, value=f"=B{i}-C{i}")
     rs.cell(row=i, column=5, value=rem)
@@ -101,7 +115,7 @@ wb.save("Filter_Order_Log.xlsx")
 ordered = defaultdict(int); need = defaultdict(int)
 for o in data["orders"]:
     for s, q, _ in o["lines"]: ordered[s] += q
-for _, s, q, st in data["units"]:
+for _, s, q, st, *_ in data["units"]:
     if st == "Replaced": need[s] += q
 for s in sizes:
     print(f"{s:10} ordered {ordered[s]:3}  needed {need[s]:3}  diff {ordered[s]-need[s]:+d}")
