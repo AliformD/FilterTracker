@@ -30,8 +30,7 @@ def job_block(ws):
     if "phase" not in job:  # job without phases
         labels.remove(("Phase", "phase"))
     # optional fields, only shown for jobs that have them
-    for lab, key in [("Airco APM", "apm"), ("PM history", "pm_history"), ("GC", "gc"),
-                     ("Job type", "job_type"), ("Warranty expires", "warranty")]:
+    for lab, key in [("Airco APM", "apm"), ("GC", "gc"), ("Job type", "job_type")]:
         if key in job:
             labels.append((lab, key))
     for r, (lab, key) in enumerate(labels, 1):
@@ -46,82 +45,139 @@ def job_block(ws):
 
 
 # ---------- Blank templates for PMs: python3 build.py --template ----------
-# Same columns and colors as the job files, but empty, with dropdowns, so a PM can fill one in by hand.
+# Same columns as the job files, but empty, with dropdowns, so a PM can fill one in by hand.
 def build_templates():
     import os
     from openpyxl.worksheet.datavalidation import DataValidation
     from openpyxl.formatting.rule import FormulaRule
+    from openpyxl.styles import Border, Side
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
     os.makedirs(out, exist_ok=True)
     RED = PatternFill("solid", fgColor="F8CBAD")
+    LABEL = PatternFill("solid", fgColor="DDEBF7")
+    BAND = PatternFill("solid", fgColor="F2F2F2")
+    thin = Side(style="thin", color="BFBFBF")
+    BOX = Border(left=thin, right=thin, top=thin, bottom=thin)
+    SETS = ["1st (media roll)", "2nd", "3rd", "Attic stock", "RFI", "Change order"]
+    HEADER_ROW = 7
 
     def dropdown(ws, cells, choices):
         # error off: the list is a shortcut, PMs can still type something else
         dv = DataValidation(type="list", formula1='"' + ",".join(choices) + '"', allow_blank=True, showErrorMessage=False)
         ws.add_data_validation(dv); dv.add(cells)
 
-    def blank_job_block(ws, legend):
-        labels = ["Job number", "Project name", "Phase", "Airco PM", "Airco APM", "Ordered by",
-                  "GC", "Job type", "PM history", "Warranty expires"]
-        for r, lab in enumerate(labels, 1):
-            ws.cell(row=r, column=1, value=lab).font = Font(bold=True)
-        ws.cell(row=len(labels) + 1, column=1, value=legend).font = Font(italic=True)
-        return len(labels) + 3
+    def title(ws, text, ncols):
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
+        ws.cell(row=1, column=1, value=text).font = Font(bold=True, size=16, color="1F4E78")
+        ws.row_dimensions[1].height = 28
+
+    def field(ws, row, col, label, last_col):
+        lab = ws.cell(row=row, column=col, value=label)
+        lab.font = Font(bold=True); lab.fill = LABEL; lab.border = BOX
+        lab.alignment = Alignment(vertical="center")
+        ws.merge_cells(start_row=row, start_column=col + 1, end_row=row, end_column=last_col)
+        for c in range(col + 1, last_col + 1):
+            ws.cell(row=row, column=c).border = BOX
+        ws.row_dimensions[row].height = 20
+
+    def job_box(ws, ncols):
+        # job info in two side by side columns so the top stays short (rows 2-5)
+        mid = ncols // 2 + 1
+        left = ["Job number", "Project name", "Phase", "Job type"]
+        right = ["Airco PM", "Airco APM", "GC", "Ordered by"]
+        for r, (a, b) in enumerate(zip(left, right), 2):
+            field(ws, r, 1, a, mid - 2 if mid - 2 > 1 else 2)
+            field(ws, r, mid, b, ncols)
+        ws.row_dimensions[6].height = 8
+
+    def table(ws, names, nrows, center_cols, wrap_cols):
+        header(ws, HEADER_ROW, names)
+        ws.row_dimensions[HEADER_ROW].height = 34
+        for c in range(1, len(names) + 1):
+            ws.cell(row=HEADER_ROW, column=c).alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+        first, last = HEADER_ROW + 1, HEADER_ROW + nrows
+        for r in range(first, last + 1):
+            # no fixed height, so rows grow by themselves when a long note wraps
+            for c in range(1, len(names) + 1):
+                cell = ws.cell(row=r, column=c)
+                cell.border = BOX
+                cell.alignment = Alignment(vertical="center", wrap_text=c in wrap_cols,
+                                           horizontal="center" if c in center_cols else None)
+        ws.freeze_panes = ws.cell(row=first, column=1)   # header stays on screen when scrolling
+        ws.print_title_rows = f"{HEADER_ROW}:{HEADER_ROW}"
+        ws.page_setup.orientation = "landscape"
+        ws.page_setup.fitToWidth = 1; ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        return first, last
+
+    def bands(ws, rng):
+        # light grey every other row; added last so red/yellow rules win
+        ws.conditional_formatting.add(rng, FormulaRule(formula=["MOD(ROW(),2)=0"], fill=BAND))
 
     # 1. Filter log
     wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
-    top = blank_job_block(ws, "Yellow = still needs info. Red = unit not replaced. One row per filter size "
-                              "(a unit that takes 2 sizes gets 2 rows). Write sizes W x L x D and say if nominal or exact.")
-    header(ws, top, ["Unit", "Filter size (W x L x D)", "QTY", "Status", "Filter set installed", "MERV", "Installed size if different from spec", "Notes"])
-    last = top + 100
-    dropdown(ws, f"D{top+1}:D{last}", ["Not started", "Needs filters", "Ordered", "Replaced", "Not replaced", "Washable - not replaced"])
-    dropdown(ws, f"E{top+1}:E{last}", ["1", "2", "3", "Attic"])
-    dropdown(ws, f"F{top+1}:F{last}", ["8", "13"])
-    ws.conditional_formatting.add(f"D{top+1}:D{last}", FormulaRule(formula=[f'$D{top+1}="Not replaced"'], fill=RED))
-    widths(ws, [14, 22, 14, 16, 20, 8, 26, 40])
-    ws.freeze_panes = ws.cell(row=top + 1, column=1)
+    cols = ["Unit", "Filter size (W x L x D)", "QTY", "Status", "Filter set or reason", "MERV",
+            "Installed size if different from spec", "Notes"]
+    title(ws, "FILTER LOG", len(cols)); job_box(ws, len(cols))
+    first, last = table(ws, cols, 100, center_cols={2, 3, 4, 5, 6, 7}, wrap_cols={8})
+    dropdown(ws, f"D{first}:D{last}", ["Not started", "Needs filters", "Ordered", "Replaced", "Not replaced", "Washable - not replaced"])
+    dropdown(ws, f"E{first}:E{last}", SETS)
+    dropdown(ws, f"F{first}:F{last}", ["8", "13"])
+    ws.conditional_formatting.add(f"A{first}:H{last}", FormulaRule(formula=[f'$D{first}="Not replaced"'], fill=RED, stopIfTrue=True))
+    bands(ws, f"A{first}:H{last}")
+    widths(ws, [16, 20, 8, 22, 20, 8, 22, 45])
     wb.save(os.path.join(out, "TEMPLATE_FilterLog.xlsx"))
 
     # 2. Order log + Needed vs Ordered
     wb = Workbook(); ws = wb.active; ws.title = "Order Log"
-    top = blank_job_block(ws, "Yellow = still needs info. Each order (new PO) starts a new row; one row per filter size. "
-                              "Put the order total only on the first row of each order. Line total fills in by itself.")
-    header(ws, top, ["Order date", "Filter set (1/2/3/Attic)", "Vendor", "Vendor SO #", "Our PO #", "MERV",
-                     "Order total price", "Size", "QTY", "Unit price", "Line total", "Units it went to", "Delivery", "Notes"])
-    last = top + 60
-    for r in range(top + 1, last + 1):
+    cols = ["Order date", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
+            "Order total price", "Size", "QTY", "Unit price", "Line total", "Delivery", "Notes"]
+    title(ws, "FILTER ORDER LOG", len(cols)); job_box(ws, len(cols))
+    first, last = table(ws, cols, 60, center_cols={1, 2, 4, 5, 6, 8, 9}, wrap_cols={3, 12, 13})
+    for r in range(first, last + 1):
         ws.cell(row=r, column=1).number_format = "mm/dd/yyyy"
         for c in (7, 10, 11):
             ws.cell(row=r, column=c).number_format = '"$"#,##0.00'
         ws.cell(row=r, column=11, value=f'=IF(OR(I{r}="",J{r}=""),"",I{r}*J{r})')
-    dropdown(ws, f"B{top+1}:B{last}", ["1", "2", "3", "Attic"])
-    dropdown(ws, f"F{top+1}:F{last}", ["8", "13"])
-    dropdown(ws, f"M{top+1}:M{last}", ["Jobsite delivery", "Will call", "Customer pickup"])
-    widths(ws, [12, 12, 16, 12, 12, 7, 14, 11, 7, 10, 11, 24, 20, 50])
-    ws.freeze_panes = ws.cell(row=top + 1, column=1)
+    dropdown(ws, f"B{first}:B{last}", SETS)
+    dropdown(ws, f"F{first}:F{last}", ["8", "13"])
+    dropdown(ws, f"L{first}:L{last}", ["Will call", "Delivered to site", "At Airco warehouse"])
+    bands(ws, f"A{first}:M{last}")
+    widths(ws, [14, 18, 18, 13, 13, 8, 14, 14, 8, 11, 12, 20, 45])
 
     rs = wb.create_sheet("Needed vs Ordered")
-    header(rs, 1, ["Size", "Ordered (all orders)", "Needed - units replaced", "Left over (+) / Short (-)",
+    title(rs, "NEEDED VS ORDERED", 5)
+    rs.cell(row=2, column=1, value="Type each size in Size. Count Needed and Still needed from the Filter Log. "
+                                   "The other two columns fill in by themselves.").font = Font(italic=True, color="595959")
+    rs.merge_cells("A2:E2")
+    header(rs, 3, ["Size", "Ordered (all orders)", "Needed - units replaced", "Left over (+) / Short (-)",
                    "Still needed - units not yet replaced"])
-    rs.cell(row=1, column=7, value="Type each size in column A. Columns C and E: count them from the Filter Log. "
-                                   "Columns B and D fill in by themselves.").font = Font(italic=True)
-    for i in range(2, 42):
-        rs.cell(row=i, column=2, value=f"=IF(A{i}=\"\",\"\",SUMIF('Order Log'!$H${top+1}:$H${last},A{i},'Order Log'!$I${top+1}:$I${last}))")
-        rs.cell(row=i, column=4, value=f'=IF(A{i}="","",B{i}-C{i})')
-    widths(rs, [12, 20, 24, 24, 34, 4, 60])
+    rs.row_dimensions[3].height = 34
+    for i in range(3, 43):
+        for c in range(1, 6):
+            cell = rs.cell(row=i, column=c); cell.border = BOX
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=i == 3)
+        if i > 3:
+            rs.cell(row=i, column=2, value=f"=IF(A{i}=\"\",\"\",SUMIF('Order Log'!$H${first}:$H${last},A{i},'Order Log'!$I${first}:$I${last}))")
+            rs.cell(row=i, column=4, value=f'=IF(A{i}="","",B{i}-C{i})')
+    rs.freeze_panes = "A4"
+    bands(rs, "A4:E42")
+    widths(rs, [16, 16, 16, 16, 18])
     wb.save(os.path.join(out, "TEMPLATE_FiltersOrders.xlsx"))
 
     # 3. Open questions
     wb = Workbook(); ws = wb.active; ws.title = "Open Questions"
-    ws.cell(row=1, column=1, value="Job ________ - ________________").font = Font(bold=True, size=13)
-    ws.cell(row=2, column=1, value='=COUNTIF(A4:A103,"Open")&" open - ready to ship when this is 0 and every unit and filter is accounted for"')
-    header(ws, 3, ["Status", "Question", "Who knows"])
-    for r in range(4, 104):
-        for c in (1, 2, 3):
-            ws.cell(row=r, column=c).alignment = Alignment(wrap_text=True, vertical="top")
-    dropdown(ws, "A4:A103", ["Open", "Answered", "Later"])
-    ws.conditional_formatting.add("A4:A103", FormulaRule(formula=['$A4="Open"'], fill=BLANK))
-    widths(ws, [11, 100, 18])
+    title(ws, "OPEN QUESTIONS", 3)
+    for r, lab in enumerate(["Job number", "Project name", "Airco PM"], 2):
+        c = ws.cell(row=r, column=1, value=lab); c.font = Font(bold=True); c.fill = LABEL; c.border = BOX
+        ws.cell(row=r, column=2).border = BOX
+        ws.row_dimensions[r].height = 20
+    ws.cell(row=5, column=2, value='=COUNTIF(A8:A107,"Open")&" open - ready to send when this is 0 and every unit and filter is accounted for"').font = Font(bold=True)
+    first, last = table(ws, ["Status", "Question", "Who knows"], 100, center_cols={1}, wrap_cols={2, 3})
+    dropdown(ws, f"A{first}:A{last}", ["Open", "Answered", "Later"])
+    ws.conditional_formatting.add(f"A{first}:A{last}", FormulaRule(formula=[f'$A{first}="Open"'], fill=BLANK, stopIfTrue=True))
+    bands(ws, f"A{first}:C{last}")
+    widths(ws, [14, 90, 22])
     wb.save(os.path.join(out, "TEMPLATE_OpenQuestions.xlsx"))
     print("Templates saved in", out)
 
