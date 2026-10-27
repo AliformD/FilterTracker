@@ -2,3 +2,4 @@
 
 One folder per job number (e.g. `2250823/`) holding `data.json` plus its three spreadsheets.
 Rebuild a job: `cd tracker/<job number> && python3 ../build.py`
+Blank PM templates: `cd tracker && python3 build.py --template` (writes tracker/templates/TEMPLATE_*.xlsx)
