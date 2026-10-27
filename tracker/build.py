@@ -128,11 +128,11 @@ def build_templates():
     widths(ws, [16, 20, 8, 22, 20, 8, 22, 45])
     wb.save(os.path.join(out, "TEMPLATE_FilterLog.xlsx"))
 
-    # 2. Order log
-    wb = Workbook(); ws = wb.active; ws.title = "Order Log"
+    # 2. Filter orders
+    wb = Workbook(); ws = wb.active; ws.title = "Filter Orders"
     cols = ["Order date", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
             "Order total price", "Size", "QTY", "Unit price", "Line total", "Delivery", "Notes"]
-    title(ws, "FILTER ORDER LOG", len(cols)); job_box(ws, len(cols))
+    title(ws, "FILTER ORDERS", len(cols)); job_box(ws, len(cols))
     first, last = table(ws, cols, 60, center_cols={1, 2, 4, 5, 6, 8, 9}, wrap_cols={3, 12, 13})
     for r in range(first, last + 1):
         ws.cell(row=r, column=1).number_format = "mm/dd/yyyy"
