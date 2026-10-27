@@ -80,15 +80,25 @@ def build_templates():
             ws.cell(row=row, column=c).border = BOX
         ws.row_dimensions[row].height = 20
 
-    def job_box(ws, ncols):
-        # job info in two side by side columns so the top stays short (rows 2-5)
+    def job_box(ws, ncols, copy_from=None):
+        # job info in two side by side columns so the top stays short (rows 2-5).
+        # copy_from: the other tab's job box, so its job info shows here without typing it twice
         mid = ncols // 2 + 1
         left = ["Job number", "Project name", "Phase", "Job type"]
         right = ["Airco PM", "Airco APM", "GC", "Ordered by"]
+        where = {}
         for r, (a, b) in enumerate(zip(left, right), 2):
             field(ws, r, 1, a, mid - 2 if mid - 2 > 1 else 2)
             field(ws, r, mid, b, ncols)
+            where[a] = ws.cell(row=r, column=2).coordinate
+            where[b] = ws.cell(row=r, column=mid + 1).coordinate
+        if copy_from:
+            sheet, cells = copy_from
+            for lab, ref in where.items():
+                src = f"'{sheet}'!{cells[lab]}"
+                ws[ref] = f'=IF({src}="","",{src})'
         ws.row_dimensions[6].height = 8
+        return where
 
     def table(ws, names, nrows, center_cols, wrap_cols):
         header(ws, HEADER_ROW, names)
@@ -118,7 +128,7 @@ def build_templates():
     wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
     cols = ["Unit", "Filter size (W x L x D)", "QTY", "Status", "Filter set or reason", "MERV",
             "Installed size if different from spec", "Notes"]
-    title(ws, "FILTER LOG", len(cols)); job_box(ws, len(cols))
+    title(ws, "FILTER LOG", len(cols)); log_box = job_box(ws, len(cols))
     first, last = table(ws, cols, 100, center_cols={2, 3, 4, 5, 6, 7}, wrap_cols={8})
     dropdown(ws, f"D{first}:D{last}", ["Not started", "Needs filters", "Ordered", "Replaced", "Not replaced", "Washable - not replaced"])
     dropdown(ws, f"E{first}:E{last}", SETS)
@@ -126,13 +136,12 @@ def build_templates():
     ws.conditional_formatting.add(f"A{first}:H{last}", FormulaRule(formula=[f'$D{first}="Not replaced"'], fill=RED, stopIfTrue=True))
     bands(ws, f"A{first}:H{last}")
     widths(ws, [16, 20, 8, 22, 20, 8, 22, 45])
-    wb.save(os.path.join(out, "TEMPLATE_FilterLog.xlsx"))
 
-    # 2. Filter orders
-    wb = Workbook(); ws = wb.active; ws.title = "Filter Orders"
+    # 2. Filter orders: second tab of the same file
+    ws = wb.create_sheet("Filter Orders")
     cols = ["Order date", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
             "Order total price", "Size", "QTY", "Unit price", "Line total", "Delivery", "Notes"]
-    title(ws, "FILTER ORDERS", len(cols)); job_box(ws, len(cols))
+    title(ws, "FILTER ORDERS", len(cols)); job_box(ws, len(cols), ("Filter Log", log_box))
     first, last = table(ws, cols, 60, center_cols={1, 2, 4, 5, 6, 8, 9}, wrap_cols={3, 12, 13})
     for r in range(first, last + 1):
         ws.cell(row=r, column=1).number_format = "mm/dd/yyyy"
@@ -146,9 +155,9 @@ def build_templates():
     widths(ws, [14, 18, 18, 13, 13, 8, 14, 14, 8, 11, 12, 20, 45])
 
     # no Needed vs Ordered sheet here: this is only a purchase log, unit/size work lives in the Filter Log
-    wb.save(os.path.join(out, "TEMPLATE_FiltersOrders.xlsx"))
+    wb.save(os.path.join(out, "TEMPLATE_FilterLog.xlsx"))
 
-    # 3. Open questions
+    # 3. Open questions (just for us, not filed with the PM)
     wb = Workbook(); ws = wb.active; ws.title = "Open Questions"
     title(ws, "OPEN QUESTIONS", 3)
     for r, lab in enumerate(["Job number", "Project name", "Airco PM"], 2):
