@@ -128,7 +128,7 @@ def build_templates():
     widths(ws, [16, 20, 8, 22, 20, 8, 22, 45])
     wb.save(os.path.join(out, "TEMPLATE_FilterLog.xlsx"))
 
-    # 2. Order log + Needed vs Ordered
+    # 2. Order log
     wb = Workbook(); ws = wb.active; ws.title = "Order Log"
     cols = ["Order date", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
             "Order total price", "Size", "QTY", "Unit price", "Line total", "Delivery", "Notes"]
@@ -145,24 +145,7 @@ def build_templates():
     bands(ws, f"A{first}:M{last}")
     widths(ws, [14, 18, 18, 13, 13, 8, 14, 14, 8, 11, 12, 20, 45])
 
-    rs = wb.create_sheet("Needed vs Ordered")
-    title(rs, "NEEDED VS ORDERED", 5)
-    rs.cell(row=2, column=1, value="Type each size in Size. Count Needed and Still needed from the Filter Log. "
-                                   "The other two columns fill in by themselves.").font = Font(italic=True, color="595959")
-    rs.merge_cells("A2:E2")
-    header(rs, 3, ["Size", "Ordered (all orders)", "Needed - units replaced", "Left over (+) / Short (-)",
-                   "Still needed - units not yet replaced"])
-    rs.row_dimensions[3].height = 34
-    for i in range(3, 43):
-        for c in range(1, 6):
-            cell = rs.cell(row=i, column=c); cell.border = BOX
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=i == 3)
-        if i > 3:
-            rs.cell(row=i, column=2, value=f"=IF(A{i}=\"\",\"\",SUMIF('Order Log'!$H${first}:$H${last},A{i},'Order Log'!$I${first}:$I${last}))")
-            rs.cell(row=i, column=4, value=f'=IF(A{i}="","",B{i}-C{i})')
-    rs.freeze_panes = "A4"
-    bands(rs, "A4:E42")
-    widths(rs, [16, 16, 16, 16, 18])
+    # no Needed vs Ordered sheet here: this is only a purchase log, unit/size work lives in the Filter Log
     wb.save(os.path.join(out, "TEMPLATE_FiltersOrders.xlsx"))
 
     # 3. Open questions
