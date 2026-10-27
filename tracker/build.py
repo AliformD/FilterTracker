@@ -24,9 +24,8 @@ SET_NAMES = {"1": "1st (media roll)", "2": "2nd", "3": "3rd", "Attic": "Attic st
 SETS = ["1st (media roll)", "2nd", "3rd", "Attic stock", "RFI", "Change order"]
 STATUSES = ["Not started", "Needs filters", "Ordered", "Replaced", "Not replaced", "Washable - not replaced"]
 DELIVERY = ["Will call", "Delivered to site", "At Airco warehouse"]
-LOG_COLS = ["Unit", "Filter size (W x L x D)", "QTY", "Status", "Filter set or reason", "MERV",
-            "Installed size if different from spec", "Notes"]
-LOG_WIDTHS = [16, 20, 8, 22, 20, 8, 22, 45]
+LOG_COLS = ["Unit", "Filter size (W x L x D)", "QTY", "Status", "Filter set or reason", "MERV", "Notes"]
+LOG_WIDTHS = [16, 20, 8, 22, 20, 8, 60]
 ORDER_COLS = ["Order date", "Ordered by", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
               "Order total price", "Size", "QTY", "Unit price", "Line total", "Delivery", "Notes"]
 ORDER_WIDTHS = [14, 16, 18, 18, 13, 13, 8, 14, 14, 8, 11, 12, 20, 45]
@@ -209,10 +208,10 @@ def build_templates():
     # 1. Filter log (main tab)
     wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
     log_box, top = log_sheet(ws)
-    first, last = table(ws, LOG_COLS, top, 100, center_cols={2, 3, 4, 5, 6, 7}, wrap_cols={8})
+    first, last = table(ws, LOG_COLS, top, 100, center_cols={2, 3, 4, 5, 6}, wrap_cols={7})
     log_lists(ws, first, last)
-    ws.conditional_formatting.add(f"A{first}:H{last}", FormulaRule(formula=[f'$D{first}="Not replaced"'], fill=BAD, stopIfTrue=True))
-    bands(ws, f"A{first}:H{last}")
+    ws.conditional_formatting.add(f"A{first}:G{last}", FormulaRule(formula=[f'$D{first}="Not replaced"'], fill=BAD, stopIfTrue=True))
+    bands(ws, f"A{first}:G{last}")
     widths(ws, LOG_WIDTHS)
 
     # 2. Filter orders: second tab of the same file. Only a purchase log, unit/size work lives in the Filter Log.
@@ -254,10 +253,10 @@ EXTRA = 20   # empty rows under the data, with the same dropdowns, for adding by
 wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
 log_box, top = log_sheet(ws, job)
 n = len(data["units"]) or data.get("blank_rows", 0)
-first, last = table(ws, LOG_COLS, top, n + EXTRA, center_cols={2, 3, 4, 5, 6, 7}, wrap_cols={8})
+first, last = table(ws, LOG_COLS, top, n + EXTRA, center_cols={2, 3, 4, 5, 6}, wrap_cols={7})
 for i, (unit, size, qty, status, *note) in enumerate(data["units"], first):
     done = status == "Replaced"
-    for c, v in enumerate([unit, size, qty, status, "2nd" if done else None, 8 if done else None, None, note[0] if note else None], 1):
+    for c, v in enumerate([unit, size, qty, status, "2nd" if done else None, 8 if done else None, note[0] if note else None], 1):
         ws.cell(row=i, column=c, value=v)
     # unknown size or qty: mark yellow
     if "?" in size:
@@ -270,8 +269,6 @@ for i, (unit, size, qty, status, *note) in enumerate(data["units"], first):
     elif not done and not status.startswith("Washable"):
         ws.cell(row=i, column=5).fill = BLANK
         ws.cell(row=i, column=6).fill = BLANK
-    if done and size.endswith('x2'):
-        ws.cell(row=i, column=7).fill = BLANK
 # no unit list yet: leave blank yellow rows to fill in
 if not data["units"]:
     for i in range(first, first + n):
