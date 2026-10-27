@@ -4,16 +4,18 @@
 Run with --template to make the blank PM templates in tracker/templates/."""
 import json, os, re, sys
 from collections import defaultdict
+from itertools import zip_longest
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.formatting.rule import FormulaRule
 
-HEAD = PatternFill("solid", fgColor="1F4E78")
+NAVY, ORANGE = "2B3C8E", "FC7C36"   # Airco logo colors
+HEAD = PatternFill("solid", fgColor=NAVY)
 BLANK = PatternFill("solid", fgColor="FFF2CC")   # yellow = still needs info
-BAD = PatternFill("solid", fgColor="F8CBAD")     # red = unit not replaced
-LABEL = PatternFill("solid", fgColor="DDEBF7")
+BAD = PatternFill("solid", fgColor="FFC7CE")     # red = unit not replaced
+LABEL = PatternFill("solid", fgColor="DCE0F0")   # light navy
 BAND = PatternFill("solid", fgColor="F2F2F2")    # light grey every other row
 thin = Side(style="thin", color="BFBFBF")
 BOX = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -25,11 +27,11 @@ DELIVERY = ["Will call", "Delivered to site", "At Airco warehouse"]
 LOG_COLS = ["Unit", "Filter size (W x L x D)", "QTY", "Status", "Filter set or reason", "MERV",
             "Installed size if different from spec", "Notes"]
 LOG_WIDTHS = [16, 20, 8, 22, 20, 8, 22, 45]
-ORDER_COLS = ["Order date", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
+ORDER_COLS = ["Order date", "Ordered by", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
               "Order total price", "Size", "QTY", "Unit price", "Line total", "Delivery", "Notes"]
-ORDER_WIDTHS = [14, 18, 18, 13, 13, 8, 14, 14, 8, 11, 12, 20, 45]
+ORDER_WIDTHS = [14, 16, 18, 18, 13, 13, 8, 14, 14, 8, 11, 12, 20, 45]
 JOB_LEFT = [("Job number", "job_number"), ("Project name", "project"), ("Phase", "phase"), ("Job type", "job_type")]
-JOB_RIGHT = [("Airco PM", "airco_pm"), ("Airco APM", "apm"), ("GC", "gc"), ("Ordered by", "ordered_by")]
+JOB_RIGHT = [("Airco PM", "airco_pm"), ("Airco APM", "apm"), ("GC", "gc")]   # Ordered by is a column on Filter Orders
 MUST_HAVE = {"job_number", "project", "airco_pm"}   # yellow when empty; the rest are optional
 
 
@@ -43,6 +45,7 @@ def header(ws, row, names):
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = HEAD
         cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+        cell.border = Border(left=thin, right=thin, top=thin, bottom=Side(style="medium", color=ORANGE))
     ws.row_dimensions[row].height = 34
 
 
@@ -59,7 +62,9 @@ def dropdown(ws, cells, choices):
 
 def title(ws, text, ncols):
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
-    ws.cell(row=1, column=1, value=text).font = Font(bold=True, size=16, color="1F4E78")
+    ws.cell(row=1, column=1, value=text).font = Font(bold=True, size=16, color=NAVY)
+    for c in range(1, ncols + 1):   # orange line under the title
+        ws.cell(row=1, column=c).border = Border(bottom=Side(style="medium", color=ORANGE))
     ws.row_dimensions[1].height = 28
 
 
@@ -86,11 +91,18 @@ def job_box(ws, ncols, job=None, copy_from=None):
     job: fill in the values. copy_from: (sheet, cells) to show the other tab's values by formula."""
     mid = ncols // 2 + 1
     where = {}
-    for r, (a, b) in enumerate(zip(JOB_LEFT, JOB_RIGHT), 2):
-        for col, last, (lab, key) in [(1, mid - 1, a), (mid, ncols, b)]:
+    for r, (a, b) in enumerate(zip_longest(JOB_LEFT, JOB_RIGHT), 2):
+        for col, last, item in [(1, mid - 1, a), (mid, ncols, b)]:
+            if not item:
+                continue
+            lab, key = item
             val = (job or {}).get(key) or None
             fill = BLANK if job is not None and key in MUST_HAVE and not val else None
             where[lab] = field(ws, r, col, lab, last, val, fill)
+    for c in range(1, ncols + 1):   # orange line between the title and the job box
+        cell = ws.cell(row=2, column=c)
+        b = cell.border
+        cell.border = Border(left=b.left, right=b.right, bottom=b.bottom, top=Side(style="medium", color=ORANGE))
     if copy_from:
         sheet, cells = copy_from
         for lab, ref in where.items():
@@ -164,15 +176,15 @@ def log_lists(ws, first, last):
 
 
 def order_lists(ws, first, last):
-    dropdown(ws, f"B{first}:B{last}", SETS)
-    dropdown(ws, f"F{first}:F{last}", ["8", "13"])
-    dropdown(ws, f"L{first}:L{last}", DELIVERY)
+    dropdown(ws, f"C{first}:C{last}", SETS)
+    dropdown(ws, f"G{first}:G{last}", ["8", "13"])
+    dropdown(ws, f"M{first}:M{last}", DELIVERY)
 
 
 def order_formats(ws, first, last):
     for r in range(first, last + 1):
         ws.cell(row=r, column=1).number_format = "mm/dd/yyyy"
-        for c in (7, 10, 11):
+        for c in (8, 11, 12):
             ws.cell(row=r, column=c).number_format = '"$"#,##0.00'
 
 
@@ -206,12 +218,12 @@ def build_templates():
     # 2. Filter orders: second tab of the same file. Only a purchase log, unit/size work lives in the Filter Log.
     ws = wb.create_sheet("Filter Orders")
     top = orders_sheet(ws, log_box)
-    first, last = table(ws, ORDER_COLS, top, 60, center_cols={1, 2, 4, 5, 6, 8, 9}, wrap_cols={3, 12, 13})
+    first, last = table(ws, ORDER_COLS, top, 60, center_cols={1, 3, 5, 6, 7, 9, 10}, wrap_cols={2, 4, 13, 14})
     order_formats(ws, first, last)
     for r in range(first, last + 1):
-        ws.cell(row=r, column=11, value=f'=IF(OR(I{r}="",J{r}=""),"",I{r}*J{r})')
+        ws.cell(row=r, column=12, value=f'=IF(OR(J{r}="",K{r}=""),"",J{r}*K{r})')
     order_lists(ws, first, last)
-    bands(ws, f"A{first}:M{last}")
+    bands(ws, f"A{first}:N{last}")
     widths(ws, ORDER_WIDTHS)
     wb.save(os.path.join(out, "TEMPLATE_FilterLog.xlsx"))
 
@@ -273,7 +285,7 @@ widths(ws, LOG_WIDTHS)
 ws = wb.create_sheet("Filter Orders")
 top = orders_sheet(ws, log_box, job)
 n = sum(len(o["lines"]) for o in data["orders"])
-first, last = table(ws, ORDER_COLS, top, n + EXTRA, center_cols={1, 2, 4, 5, 6, 8, 9}, wrap_cols={3, 12, 13})
+first, last = table(ws, ORDER_COLS, top, n + EXTRA, center_cols={1, 3, 5, 6, 7, 9, 10}, wrap_cols={2, 4, 13, 14})
 order_formats(ws, first, last)
 r = first
 for o in data["orders"]:
@@ -283,15 +295,16 @@ for o in data["orders"]:
         note = o["note"] if first_line else None
         if first_line and o.get("units"):
             note = (note + " " if note else "") + "Units: " + o["units"]
-        vals = [o["date"], set_name(o["set"]), o["vendor"], o["vendor_so"], o["po_number"] or None, o["merv"],
-                o["price"] if first_line else None, size, qty, price, f"=I{r}*J{r}", o["delivery"], note]
+        # who placed this order; falls back to the job's "ordered_by" only for old data without it
+        vals = [o["date"], o.get("ordered_by") or job.get("ordered_by") or None, set_name(o["set"]), o["vendor"], o["vendor_so"], o["po_number"] or None, o["merv"],
+                o["price"] if first_line else None, size, qty, price, f"=J{r}*K{r}", o["delivery"], note]
         for c, v in enumerate(vals, 1):
             cell = ws.cell(row=r, column=c, value=v)
-            if v is None and (c in (2, 5) or (first_line and c in (1, 3, 4, 6, 7, 12))):
+            if v is None and (c in (2, 3, 6) or (first_line and c in (1, 4, 5, 7, 8, 13))):
                 cell.fill = BLANK
         r += 1
 for rr in range(r, last + 1):
-    ws.cell(row=rr, column=11, value=f'=IF(OR(I{rr}="",J{rr}=""),"",I{rr}*J{rr})')
+    ws.cell(row=rr, column=12, value=f'=IF(OR(J{rr}="",K{rr}=""),"",J{rr}*K{rr})')
 stripes(ws, first, last, len(ORDER_COLS))
 order_lists(ws, first, last)
 widths(ws, ORDER_WIDTHS)
