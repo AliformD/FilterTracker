@@ -1,8 +1,12 @@
 """Builds a job's spreadsheets from data.json (run inside the job folder):
-  jobnumber_PROJECT_FilterLog.xlsx   - the file for the PM: tab 1 Filter Log, tab 2 Filter Orders
+  jobnumber_PROJECT_FilterLog.xlsx   - the file for the PM, same layout as the approved template (10/28):
+                                       tab 1 Filter Log, tab 2 Tech Filter Form (printed), tab 3 Filter Orders
   jobnumber_PROJECT_OpenQuestions.xlsx - just for us, not filed
-Run with --template to make the blank PM templates in tracker/templates/."""
+Unit rows in data.json: [tag, size, qty, status, note, {"1"/"2"/"3"/"CO": "mm/dd/yyyy" date changed}],
+the note and dates are optional.
+Run with --template to make the blank PM templates in tracker/templates/, --log-only to skip Open Questions."""
 import json, os, re, sys
+from datetime import datetime
 from collections import defaultdict
 from itertools import zip_longest
 from openpyxl import Workbook
@@ -25,13 +29,7 @@ SET_NAMES = {"1": "1st (media roll)", "2": "2nd", "3": "3rd", "Attic": "Attic st
 SETS = ["1st (media roll)", "2nd", "3rd", "Attic stock", "RFI", "Change order"]
 STATUSES = ["Not started", "Needs filters", "Ordered", "Replaced", "Not replaced", "Washable - not replaced"]
 DELIVERY = ["Will call", "Delivered to site", "At Airco warehouse"]
-# layout from the PMs' copy (10/28): Equipment Tag, Filter Type, ..., Date Changed, Notes
-LOG_COLS = ["Equipment Tag", "Filter Type (Pre or final)", "Filter size (W x L x D)", "QTY", "MERV", "Status",
-            "Filter set or reason", "Date Changed", "Notes"]
-LOG_WIDTHS = [16, 14, 20, 8, 8, 22, 20, 12, 60]
-LOG_CENTER = set(range(1, 9))          # everything but Notes is centered
 ORDER_CENTER = set(range(1, 14))
-FILTER_TYPES = ["Pre", "Final"]
 ORDER_COLS = ["Order date", "Ordered by", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
               "Order total price", "Size", "QTY", "Unit price", "Line total", "Delivery", "Notes"]
 ORDER_WIDTHS = [14, 16, 18, 18, 13, 13, 8, 14, 14, 8, 11, 12, 20, 45]
@@ -137,19 +135,6 @@ def job_box(ws, ncols, job=None, copy_from=None, split=None):
     return where
 
 
-def note_row(ws, ncols, text):
-    """Optional job note under the job box (row 6). Returns the header row."""
-    text = re.sub(r"\s*Yellow = still needs info\.?", "", text or "").strip()
-    if not text:
-        ws.row_dimensions[6].height = 8
-        return 7
-    ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=ncols)
-    c = ws.cell(row=6, column=1, value=text)
-    c.font = Font(italic=True, color="404040"); c.alignment = Alignment(wrap_text=True, vertical="top")
-    ws.row_dimensions[6].height = 15 * (len(text) // 150 + 1) + 4
-    return 8
-
-
 def table(ws, names, top, nrows, center_cols, wrap_cols):
     """Header at row top, nrows bordered rows under it. Header stays on screen and prints on every page."""
     header(ws, top, names)
@@ -179,29 +164,12 @@ def stripes(ws, first, last, ncols):
                     cell.fill = BAND
 
 
-def log_sheet(ws, job=None):
-    widths(ws, LOG_WIDTHS)
-    title(ws, "FILTER LOG", len(LOG_COLS))
-    box = job_box(ws, len(LOG_COLS), job)
-    top = note_row(ws, len(LOG_COLS), job and job.get("note"))
-    return box, top
-
-
 def orders_sheet(ws, log_box, job=None):
     widths(ws, ORDER_WIDTHS)
     title(ws, "FILTER ORDERS", len(ORDER_COLS))
     job_box(ws, len(ORDER_COLS), job, ("Filter Log", log_box))
     ws.row_dimensions[6].height = 8
     return 7
-
-
-def log_lists(ws, first, last):
-    dropdown(ws, f"B{first}:B{last}", FILTER_TYPES)
-    dropdown(ws, f"E{first}:E{last}", ["8", "13"])
-    dropdown(ws, f"F{first}:F{last}", STATUSES)
-    dropdown(ws, f"G{first}:G{last}", SETS)
-    for r in range(first, last + 1):
-        ws.cell(row=r, column=8).number_format = "mm/dd/yyyy"
 
 
 def order_lists(ws, first, last):
@@ -301,6 +269,27 @@ def tech_sheet(ws, log_box, first, last):
         "_xlnm.Print_Area", attr_text=f"'{ws.title}'!$A$1:INDEX('{ws.title}'!$G${first}:$G${last},{rows})")
 
 
+def new_log_sheet(ws, nrows, job=None):
+    """Filter Log tab in the approved PM layout (10/28). Header row 8, units from row 9."""
+    widths(ws, TPL_LOG_WIDTHS)
+    ncols = len(TPL_LOG_COLS)
+    title(ws, "FILTER LOG", ncols)
+    log_box = job_box(ws, ncols, job, split=(4, 7, 8))
+    ws.row_dimensions[3].height = 30   # room for a long project name on two lines
+    ws.row_dimensions[6].height = ws.row_dimensions[7].height = 8
+    note = re.sub(r"\s*Yellow = still needs info\.?", "", (job or {}).get("note") or "").strip()
+    if note:   # optional job note on row 6, the table still starts on row 8
+        ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=ncols)
+        c = ws.cell(row=6, column=1, value=note)
+        c.font = Font(italic=True, color="404040"); c.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.row_dimensions[6].height = 15 * (len(note) // 180 + 1) + 4
+    first, last = table(ws, TPL_LOG_COLS, 8, nrows, center_cols=set(range(1, 11)), wrap_cols={2, 11})
+    dropdown(ws, f"F{first}:F{last}", STATUSES)
+    date_only(ws, f"G{first}:J{last}")
+    page_numbers(ws, "Filter Log")
+    return log_box, first, last
+
+
 def build_templates():
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
     os.makedirs(out, exist_ok=True)
@@ -311,17 +300,9 @@ def build_templates():
 
     # 1. Filter log (main tab). PMs fill this in from submittals; one date column per set.
     wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
-    widths(ws, TPL_LOG_WIDTHS)
-    title(ws, "FILTER LOG", len(TPL_LOG_COLS))
-    log_box = job_box(ws, len(TPL_LOG_COLS), split=(4, 7, 8))
-    ws.row_dimensions[6].height = ws.row_dimensions[7].height = 8
-    ws.row_dimensions[3].height = 30   # room for a long project name on two lines
-    first, last = table(ws, TPL_LOG_COLS, 8, TPL_ROWS, center_cols=set(range(1, 11)), wrap_cols={2, 11})
-    dropdown(ws, f"F{first}:F{last}", STATUSES)
-    date_only(ws, f"G{first}:J{last}")
+    log_box, first, last = new_log_sheet(ws, TPL_ROWS)
     ws.conditional_formatting.add(f"A{first}:K{last}", FormulaRule(formula=[f'$F{first}="Not replaced"'], fill=BAD, stopIfTrue=True))
     bands(ws, f"A{first}:K{last}")
-    page_numbers(ws, "Filter Log")
 
     # 2. Tech filter form: printed and handed to the tech. Unit info comes from the Filter Log by formula,
     # the tech writes the date and notes by hand.
@@ -365,15 +346,18 @@ EXTRA = 20   # empty rows under the data, with the same dropdowns, for adding by
 
 # ---------- 1. Filter log (tab 1 of the PM file) ----------
 wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
-log_box, top = log_sheet(ws, job)
 n = len(data["units"]) or data.get("blank_rows", 0)
-first, last = table(ws, LOG_COLS, top, n + EXTRA, center_cols=LOG_CENTER, wrap_cols={2, 9})
-for i, (unit, size, qty, status, *note) in enumerate(data["units"], first):
+log_box, first, last = new_log_sheet(ws, n + EXTRA, job)
+DATE_COL = {"1": 7, "2": 8, "3": 9, "CO": 10}   # Date Changed 1st / 2nd / 3rd / C/O
+for i, (unit, size, qty, status, *more) in enumerate(data["units"], first):
     done = status == "Replaced"
-    note = note[0] if note else None
-    vals = [unit, filter_type(note), size, qty, 8 if done else None, status, "2nd" if done else None, None, note]
+    note = more[0] if more else None
+    dates = more[1] if len(more) > 1 else {}   # optional 6th item: {"2": "10/28/2026", ...}
+    vals = [unit, filter_type(note), size, qty, 8 if done else None, status, None, None, None, None, note]
     for c, v in enumerate(vals, 1):
         ws.cell(row=i, column=c, value=v)
+    for k, d in (dates or {}).items():
+        ws.cell(row=i, column=DATE_COL[k], value=datetime.strptime(d, "%m/%d/%Y"))
     # unknown unit tag (size tally, no unit list yet), size or qty: mark yellow
     if str(unit).startswith("TBD"):
         ws.cell(row=i, column=1).fill = BLANK
@@ -382,21 +366,23 @@ for i, (unit, size, qty, status, *note) in enumerate(data["units"], first):
     if qty is None:
         ws.cell(row=i, column=4).fill = BLANK
     if status == "Not replaced":
-        for c in range(1, len(LOG_COLS) + 1):
+        for c in range(1, len(TPL_LOG_COLS) + 1):
             ws.cell(row=i, column=c).fill = BAD
+    elif done and not dates:
+        ws.cell(row=i, column=DATE_COL["2"]).fill = BLANK   # replaced (2nd set) but no date yet
     elif not done and not status.startswith("Washable"):
         ws.cell(row=i, column=5).fill = BLANK   # MERV
-        ws.cell(row=i, column=7).fill = BLANK   # set
 # no unit list yet: leave blank yellow rows to fill in
 if not data["units"]:
     for i in range(first, first + n):
-        for c in range(1, len(LOG_COLS) + 1):
+        for c in range(1, len(TPL_LOG_COLS) + 1):
             ws.cell(row=i, column=c).fill = BLANK
-stripes(ws, first, last, len(LOG_COLS))
-log_lists(ws, first, last)
-widths(ws, LOG_WIDTHS)
+stripes(ws, first, last, len(TPL_LOG_COLS))
 
-# ---------- 2. Filter orders (tab 2 of the PM file) ----------
+# ---------- 2. Tech filter form (tab 2, printed for the tech) ----------
+tech_sheet(wb.create_sheet("Tech Filter Form"), log_box, first, last)
+
+# ---------- 3. Filter orders (tab 3 of the PM file) ----------
 ws = wb.create_sheet("Filter Orders")
 top = orders_sheet(ws, log_box, job)
 n = sum(len(o["lines"]) for o in data["orders"])
@@ -423,6 +409,7 @@ for rr in range(r, last + 1):
 stripes(ws, first, last, len(ORDER_COLS))
 order_lists(ws, first, last)
 widths(ws, ORDER_WIDTHS)
+page_numbers(ws, "Filter Orders")
 wb.save(prefix + "FilterLog.xlsx")
 
 # console summary: ordered vs needed per size (for us; no longer a sheet in the PM file)
@@ -434,7 +421,9 @@ for _, s, q, st, *_ in data["units"]:
 for s in sorted(set(ordered) | set(need)):
     print(f"{s:10} ordered {ordered[s]:3}  needed {need[s]:3}  diff {ordered[s]-need[s]:+d}")
 
-# ---------- 3. Open questions (just for us, not filed with the PM) ----------
+# ---------- 4. Open questions (just for us, not filed with the PM) ----------
+if "--log-only" in sys.argv:   # only rebuild the PM file
+    sys.exit()
 wb = Workbook(); ws = wb.active; ws.title = "Open Questions"
 questions_sheet(ws, job)
 n_open = sum(1 for q in data["questions"] if q[0] == "Open")
