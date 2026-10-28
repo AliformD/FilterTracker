@@ -24,14 +24,25 @@ SET_NAMES = {"1": "1st (media roll)", "2": "2nd", "3": "3rd", "Attic": "Attic st
 SETS = ["1st (media roll)", "2nd", "3rd", "Attic stock", "RFI", "Change order"]
 STATUSES = ["Not started", "Needs filters", "Ordered", "Replaced", "Not replaced", "Washable - not replaced"]
 DELIVERY = ["Will call", "Delivered to site", "At Airco warehouse"]
-LOG_COLS = ["Unit", "Filter size (W x L x D)", "QTY", "Status", "Filter set or reason", "MERV", "Notes"]
-LOG_WIDTHS = [16, 20, 8, 22, 20, 8, 60]
+# layout from the PMs' copy (10/28): Equipment Tag, Filter Type, ..., Date Changed, Notes
+LOG_COLS = ["Equipment Tag", "Filter Type (Pre or final)", "Filter size (W x L x D)", "QTY", "MERV", "Status",
+            "Filter set or reason", "Date Changed", "Notes"]
+LOG_WIDTHS = [16, 14, 20, 8, 8, 22, 20, 12, 60]
+LOG_CENTER = set(range(1, 9))          # everything but Notes is centered
+ORDER_CENTER = set(range(1, 14))
+FILTER_TYPES = ["Pre", "Final"]
 ORDER_COLS = ["Order date", "Ordered by", "Filter set or reason", "Vendor", "Vendor SO #", "Our PO #", "MERV",
               "Order total price", "Size", "QTY", "Unit price", "Line total", "Delivery", "Notes"]
 ORDER_WIDTHS = [14, 16, 18, 18, 13, 13, 8, 14, 14, 8, 11, 12, 20, 45]
 JOB_LEFT = [("Job number", "job_number"), ("Project name", "project"), ("Phase", "phase"), ("Job type", "job_type")]
 JOB_RIGHT = [("Airco PM", "airco_pm"), ("Airco APM", "apm"), ("GC", "gc")]   # Ordered by is a column on Filter Orders
 MUST_HAVE = {"job_number", "project", "airco_pm"}   # yellow when empty; the rest are optional
+
+
+def filter_type(note):
+    # "Pre-filter, MERV 8." -> Pre, "Final filter ..." -> Final, otherwise left blank
+    n = (note or "").lower()
+    return "Pre" if n.startswith(("pre-filter", "pre filter")) else "Final" if n.startswith("final filter") else None
 
 
 def set_name(s):
@@ -43,7 +54,7 @@ def header(ws, row, names):
         cell = ws.cell(row=row, column=c, value=n)
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = HEAD
-        cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+        cell.alignment = Alignment(wrap_text=True, horizontal="left" if n == "Notes" else "center", vertical="center")
         cell.border = Border(left=thin, right=thin, top=thin, bottom=Side(style="medium", color=ORANGE))
     ws.row_dimensions[row].height = 34
 
@@ -70,12 +81,12 @@ def title(ws, text, ncols):
 def field(ws, row, col, label, last_col, value=None, fill=None):
     lab = ws.cell(row=row, column=col, value=label)
     lab.font = Font(bold=True); lab.fill = LABEL; lab.border = BOX
-    lab.alignment = Alignment(vertical="center")
+    lab.alignment = Alignment(horizontal="left", vertical="center")
     ws.merge_cells(start_row=row, start_column=col + 1, end_row=row, end_column=last_col)
     for c in range(col + 1, last_col + 1):
         ws.cell(row=row, column=c).border = BOX
     v = ws.cell(row=row, column=col + 1, value=value)
-    v.alignment = Alignment(vertical="center", wrap_text=True)
+    v.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
     if fill:
         v.fill = fill
     # merged cells do not grow by themselves, so give long values (project name) two lines
@@ -89,6 +100,9 @@ def job_box(ws, ncols, job=None, copy_from=None):
     """Job info in two side by side columns (rows 2-5) so the top stays short.
     job: fill in the values. copy_from: (sheet, cells) to show the other tab's values by formula."""
     mid = ncols // 2 + 1
+    # right side labels need a wide enough column ("Airco APM"), so skip narrow ones like QTY/MERV
+    while (ws.column_dimensions[get_column_letter(mid)].width or 10) < 14 and mid < ncols - 1:
+        mid += 1
     where = {}
     for r, (a, b) in enumerate(zip_longest(JOB_LEFT, JOB_RIGHT), 2):
         for col, last, item in [(1, mid - 1, a), (mid, ncols, b)]:
@@ -133,7 +147,7 @@ def table(ws, names, top, nrows, center_cols, wrap_cols):
             cell = ws.cell(row=r, column=c)
             cell.border = BOX
             cell.alignment = Alignment(vertical="center", wrap_text=c in wrap_cols,
-                                       horizontal="center" if c in center_cols else None)
+                                       horizontal="center" if c in center_cols else "left")
     ws.freeze_panes = ws.cell(row=first, column=1)
     ws.print_title_rows = f"{top}:{top}"
     ws.page_setup.orientation = "landscape"
@@ -169,9 +183,12 @@ def orders_sheet(ws, log_box, job=None):
 
 
 def log_lists(ws, first, last):
-    dropdown(ws, f"D{first}:D{last}", STATUSES)
-    dropdown(ws, f"E{first}:E{last}", SETS)
-    dropdown(ws, f"F{first}:F{last}", ["8", "13"])
+    dropdown(ws, f"B{first}:B{last}", FILTER_TYPES)
+    dropdown(ws, f"E{first}:E{last}", ["8", "13"])
+    dropdown(ws, f"F{first}:F{last}", STATUSES)
+    dropdown(ws, f"G{first}:G{last}", SETS)
+    for r in range(first, last + 1):
+        ws.cell(row=r, column=8).number_format = "mm/dd/yyyy"
 
 
 def order_lists(ws, first, last):
@@ -208,16 +225,16 @@ def build_templates():
     # 1. Filter log (main tab)
     wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
     log_box, top = log_sheet(ws)
-    first, last = table(ws, LOG_COLS, top, 100, center_cols={2, 3, 4, 5, 6}, wrap_cols={7})
+    first, last = table(ws, LOG_COLS, top, 100, center_cols=LOG_CENTER, wrap_cols={2, 9})
     log_lists(ws, first, last)
-    ws.conditional_formatting.add(f"A{first}:G{last}", FormulaRule(formula=[f'$D{first}="Not replaced"'], fill=BAD, stopIfTrue=True))
-    bands(ws, f"A{first}:G{last}")
+    ws.conditional_formatting.add(f"A{first}:I{last}", FormulaRule(formula=[f'$F{first}="Not replaced"'], fill=BAD, stopIfTrue=True))
+    bands(ws, f"A{first}:I{last}")
     widths(ws, LOG_WIDTHS)
 
     # 2. Filter orders: second tab of the same file. Only a purchase log, unit/size work lives in the Filter Log.
     ws = wb.create_sheet("Filter Orders")
     top = orders_sheet(ws, log_box)
-    first, last = table(ws, ORDER_COLS, top, 60, center_cols={1, 3, 5, 6, 7, 9, 10}, wrap_cols={2, 4, 13, 14})
+    first, last = table(ws, ORDER_COLS, top, 60, center_cols=ORDER_CENTER, wrap_cols={2, 4, 13, 14})
     order_formats(ws, first, last)
     for r in range(first, last + 1):
         ws.cell(row=r, column=12, value=f'=IF(OR(J{r}="",K{r}=""),"",J{r}*K{r})')
@@ -253,22 +270,24 @@ EXTRA = 20   # empty rows under the data, with the same dropdowns, for adding by
 wb = Workbook(); ws = wb.active; ws.title = "Filter Log"
 log_box, top = log_sheet(ws, job)
 n = len(data["units"]) or data.get("blank_rows", 0)
-first, last = table(ws, LOG_COLS, top, n + EXTRA, center_cols={2, 3, 4, 5, 6}, wrap_cols={7})
+first, last = table(ws, LOG_COLS, top, n + EXTRA, center_cols=LOG_CENTER, wrap_cols={2, 9})
 for i, (unit, size, qty, status, *note) in enumerate(data["units"], first):
     done = status == "Replaced"
-    for c, v in enumerate([unit, size, qty, status, "2nd" if done else None, 8 if done else None, note[0] if note else None], 1):
+    note = note[0] if note else None
+    vals = [unit, filter_type(note), size, qty, 8 if done else None, status, "2nd" if done else None, None, note]
+    for c, v in enumerate(vals, 1):
         ws.cell(row=i, column=c, value=v)
     # unknown size or qty: mark yellow
     if "?" in size:
-        ws.cell(row=i, column=2).fill = BLANK
-    if qty is None:
         ws.cell(row=i, column=3).fill = BLANK
+    if qty is None:
+        ws.cell(row=i, column=4).fill = BLANK
     if status == "Not replaced":
         for c in range(1, len(LOG_COLS) + 1):
             ws.cell(row=i, column=c).fill = BAD
     elif not done and not status.startswith("Washable"):
-        ws.cell(row=i, column=5).fill = BLANK
-        ws.cell(row=i, column=6).fill = BLANK
+        ws.cell(row=i, column=5).fill = BLANK   # MERV
+        ws.cell(row=i, column=7).fill = BLANK   # set
 # no unit list yet: leave blank yellow rows to fill in
 if not data["units"]:
     for i in range(first, first + n):
@@ -282,7 +301,7 @@ widths(ws, LOG_WIDTHS)
 ws = wb.create_sheet("Filter Orders")
 top = orders_sheet(ws, log_box, job)
 n = sum(len(o["lines"]) for o in data["orders"])
-first, last = table(ws, ORDER_COLS, top, n + EXTRA, center_cols={1, 3, 5, 6, 7, 9, 10}, wrap_cols={2, 4, 13, 14})
+first, last = table(ws, ORDER_COLS, top, n + EXTRA, center_cols=ORDER_CENTER, wrap_cols={2, 4, 13, 14})
 order_formats(ws, first, last)
 r = first
 for o in data["orders"]:
