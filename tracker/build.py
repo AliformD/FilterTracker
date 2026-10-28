@@ -5,7 +5,7 @@
 Unit rows in data.json: [tag, size, qty, status, note, {"1"/"2"/"3"/"CO": "mm/dd/yyyy" date changed}],
 the note and dates are optional.
 Run with --template to make the blank PM templates in tracker/templates/, --log-only to skip Open Questions."""
-import json, os, re, sys
+import json, os, re, sys, zipfile
 from datetime import datetime
 from collections import defaultdict
 from itertools import zip_longest
@@ -290,6 +290,47 @@ def new_log_sheet(ws, nrows, job=None):
     return log_box, first, last
 
 
+def save(wb, path):
+    """Save, then write the answers of our simple formulas into the file too. openpyxl saves formulas with no
+    answer, and Excel's Protected View, phone apps, Outlook preview and SharePoint web show those as blank
+    until the file is opened for editing. With the answers saved, the Tech Filter Form shows everywhere."""
+    wb.save(path)
+    values = {(ws.title, c.coordinate): c.value for ws in wb for row in ws.iter_rows() for c in row}
+
+    def answer(sheet, formula):
+        m = re.fullmatch(r"IF\('([^']+)'!(\w+)=\"\",\"\",'\1'!\2\)", formula)   # copy of another tab's cell
+        if m:
+            v = values.get((m[1], m[2]))
+            return "" if v is None or str(v).startswith("=") else v
+        m = re.fullmatch(r"(?:IF\(OR\((\w+)=\"\",(\w+)=\"\"\),\"\",)?(\w+)\*(\w+)\)?", formula)   # QTY x unit price
+        if m:
+            a, b = values.get((sheet, m[3])), values.get((sheet, m[4]))
+            return a * b if isinstance(a, (int, float)) and isinstance(b, (int, float)) else ""
+        return None   # unknown formula: leave it for Excel
+
+    def esc(t):
+        return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    names = {f"xl/worksheets/sheet{i}.xml": ws.title for i, ws in enumerate(wb, 1)}
+    with zipfile.ZipFile(path) as z:
+        parts = {n: z.read(n) for n in z.namelist()}
+    for part, sheet in names.items():
+        def fill(m):
+            f = m[3].replace("&quot;", '"').replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            v = answer(sheet, f)
+            if v is None:
+                return m[0]
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                return f'<c r="{m[1]}"{m[2]}><f>{m[3]}</f><v>{v}</v></c>'
+            return f'<c r="{m[1]}"{m[2]} t="str"><f>{m[3]}</f><v>{esc(str(v))}</v></c>'
+        xml = parts[part].decode()
+        xml = re.sub(r'<c r="(\w+)"((?: s="\d+")?)><f>([^<]*)</f><v\s*/?>(?:</v>)?</c>', fill, xml)
+        parts[part] = xml.encode()
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for n, data in parts.items():
+            z.writestr(n, data)
+
+
 def build_templates():
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
     os.makedirs(out, exist_ok=True)
@@ -319,7 +360,7 @@ def build_templates():
     bands(ws, f"A{first}:N{last}")
     widths(ws, ORDER_WIDTHS)
     page_numbers(ws, "Filter Orders")
-    wb.save(os.path.join(out, "TEMPLATE_FilterLog.xlsx"))
+    save(wb, os.path.join(out, "TEMPLATE_FilterLog.xlsx"))
 
     # 4. Open questions (just for us, not filed with the PM)
     wb = Workbook(); ws = wb.active; ws.title = "Open Questions"
@@ -410,7 +451,7 @@ stripes(ws, first, last, len(ORDER_COLS))
 order_lists(ws, first, last)
 widths(ws, ORDER_WIDTHS)
 page_numbers(ws, "Filter Orders")
-wb.save(prefix + "FilterLog.xlsx")
+save(wb, prefix + "FilterLog.xlsx")
 
 # console summary: ordered vs needed per size (for us; no longer a sheet in the PM file)
 ordered = defaultdict(int); need = defaultdict(int)
